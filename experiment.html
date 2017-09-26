@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Simple Farm Scene</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				background-color: #000;
+				color: #000;
+				margin: 0px;
+				overflow: hidden;
+			}
+
+			#info {
+				position: absolute;
+				top: 0px; width: 100%;
+				color: #ffffff;
+				padding: 6px;
+				font-family: Arial, Helvetica, sans-serif;
+				font-size: 13px;
+				text-align: center;
+			}
+
+	
+
+		</style>
+	</head>
+
+	<body>
+		<div id="info">Simple Farm Scene<br/>
+			Up arrow - zoom in |
+			Down arrow - zoom out |
+			Left arrow - pan left |
+			Right arrow - pan right |<br/>
+			Camera orbit up / down with left mouse button | 
+			D - day |
+			N - night |<br/>
+			<button onclick="quitFunction()">Quit</button>
+
+		</div>
+
+		<script src="build/three.js"></script>
+		<script src="js/Detector.js"></script>
+		<script src="js/controls/OrbitControls.js"></script>
+
+		<script>
+
+			if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
+			
+            var renderer, scene, camera;
+            var zoom = 1.0, inc = -0.01;
+            var sun, lightHelper, bulbHelper, shadowCameraHelper;
+   			var loader;
+			var materials, groundMaterial, groundTexture;
+		    var sunlight = 0;
+		    var textureCube;
+		    var r;
+	        var clock = new THREE.Clock();
+			
+			
+			//detecting the keyboard keys, calling relevent function
+			
+			document.addEventListener('keydown', function(event) {
+			var x = event.keyCode;
+            if ( x == 68 ) {
+                 sunlight = 0;
+                 var r = "textures/cube/day/";
+                 				var urls = [
+					r + "px.jpg", r + "nx.jpg",
+					r + "py.jpg", r + "ny.jpg",
+					r + "pz.jpg", r + "nz.jpg"
+				];
+				textureCube = new THREE.CubeTextureLoader().load( urls );
+		          scene.background = textureCube;
+
+                } else if ( x == 78 ){
+                sunlight = 110000;
+                var r = "textures/cube/night/";
+             
+				var urls = [
+					r + "px.jpg", r + "nx.jpg",
+					r + "py.jpg", r + "ny.jpg",
+					r + "pz.jpg", r + "nz.jpg"
+				];
+				textureCube = new THREE.CubeTextureLoader().load( urls );
+		        scene.background = textureCube;
+		        
+                } else if ( x == 38 ){
+                
+                  //zoom in
+                  var fov = camera.fov
+                  if(fov > 10){
+                  camera.fov = fov * zoom;
+                  camera.updateProjectionMatrix();
+                  zoom += inc; 
+                  } else {
+                  zoom = 1.0
+                  }
+              
+                } else if ( x == 40 ){
+                
+                  //zoom out                  
+                  var fov = camera.fov
+                  if(fov <= 90){
+                  camera.fov = fov * zoom;
+                  camera.updateProjectionMatrix();
+                  zoom -= inc;    
+                  } else {
+                  zoom = 1.0
+                  }
+              
+                }  else if ( x == 27 ){
+                
+                    quitFunction();
+                    
+                }
+            });
+            
+ 
+ 
+            //fuction to close existing open window
+            function quitFunction(url) {
+                            
+               var newWindow = window.open('', '_self', ''); //open the current window
+			   window.location="http://localhost/";
+               window.close(url);
+   
+            }
+            
+			
+		
+
+
+			init();
+			animate();
+
+			function init() {
+			                    
+				renderer = new THREE.WebGLRenderer();
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.physicallyCorrectLights = true;
+				renderer.gammaInput = true;
+				renderer.gammaOutput = true;
+				renderer.shadowMap.enabled = true;
+				renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
+				renderer.toneMappingExposure = 0.7;
+				
+			    document.body.appendChild( renderer.domElement );
+
+                // SCENE
+			
+				scene = new THREE.Scene();
+		
+                 r = "textures/cube/day/";
+                 				var urls = [
+					r + "px.jpg", r + "nx.jpg",
+					r + "py.jpg", r + "ny.jpg",
+					r + "pz.jpg", r + "nz.jpg"
+				];
+				textureCube = new THREE.CubeTextureLoader().load( urls );
+		        scene.background = textureCube;
+             
+
+				// camera
+
+				camera = new THREE.PerspectiveCamera( 35, window.innerWidth / window.innerHeight, 1, 10000 );
+							
+				camera.position.set( 1300, 40, 1500 );
+				camera.useTarget = false;
+            
+				
+				var controls = new THREE.OrbitControls( camera, renderer.domElement );
+				controls.addEventListener( 'change', render );
+			
+				
+				controls.minPolarAngle = 0 ;
+				controls.maxPolarAngle = Math.PI * 0.5;
+	
+				controls.minDistance = 1000;
+				controls.maxDistance = 7000;
+				controls.enableZoom = false; //overriden my change in OrbitCons.js
+				
+				// How far you can orbit horizontally, upper and lower limits.
+	            //controls.minAzimuthAngle =  Math.PI * 2.0; // radians
+	            //controls.maxAzimuthAngle =   Math.PI * 2.0; // radians
+				
+				controls.enableKeys = true;
+			    controls.keys = { LEFT: 37, RIGHT: 39,};
+	            controls.enablePan = true;		
+				controls.keyPanSpeed = 30.0;	// pixels moved per arrow key push
+			
+         
+								
+				//Add the Garden lights
+				
+				
+				//Light A
+				var bulbGeometry = new THREE.SphereGeometry( 3.4, 16, 8 );
+				bulbLightA = new THREE.PointLight( 0xffffff, 2, 140, 2 );
+				bulbMat = new THREE.MeshStandardMaterial( {
+					emissive: 0xffffee,
+					emissiveIntensity: 1,
+					color: 0x222222
+				});
+				bulbLightA.add( new THREE.Mesh( bulbGeometry, bulbMat ) );
+				bulbLightA.position.set( 440, -198, 460);
+				bulbLightA.castShadow = true;
+				scene.add( bulbLightA );
+				
+				bulbHelperA = new THREE.PointLightHelper( bulbLightA );
+				scene.add( bulbHelperA );
+				
+				var sphereGeometry = new THREE.SphereGeometry( 40, 8, 6, 0, 7, 0, 0.8);
+                var sphereMaterial = new THREE.MeshPhongMaterial( { color: 0x80bbbb6, specular: 0x888888, shininess: 20, } );                
+                var gardenLampSphereA = new THREE.Mesh( sphereGeometry, sphereMaterial );
+                gardenLampSphereA.position.set(440, -220, 460);
+                gardenLampSphereA.receiveShadow = true;
+				gardenLampSphereA.castShadow = true;
+                scene.add( gardenLampSphereA );
+                
+                var cylinderGeometry = new THREE.CylinderGeometry( 5, 5, 70, 8 );
+                var gardenLampCylinderA = new THREE.Mesh( cylinderGeometry, sphereMaterial );
+                gardenLampCylinderA.position.set(430, -220, 460);
+                gardenLampCylinderA.receiveShadow = true;
+                gardenLampCylinderA.castShadow = true;
+                scene.add( gardenLampCylinderA );
+                
+                //Light B
+		      	bulbLightB = new THREE.PointLight( 0xffffff, 2, 140, 2 );
+				bulbLightB.add( new THREE.Mesh( bulbGeometry, bulbMat ) );
+				bulbLightB.position.set( 440, -198, 230);
+				bulbLightB.castShadow = true;
+				scene.add( bulbLightB );
+				
+				bulbHelperB = new THREE.PointLightHelper( bulbLightB );
+				scene.add( bulbHelperB );
+				   
+                var gardenLampSphereB = new THREE.Mesh( sphereGeometry, sphereMaterial );
+                gardenLampSphereB.position.set(440, -220, 230);
+                gardenLampSphereB.receiveShadow = true;
+				gardenLampSphereB.castShadow = true;
+                scene.add( gardenLampSphereB );
+                
+                var cylinderGeometry = new THREE.CylinderGeometry( 5, 5, 70, 8 );
+                var gardenLampCylinderB = new THREE.Mesh( cylinderGeometry, sphereMaterial );
+                gardenLampCylinderB.position.set(430, -220, 230);
+                gardenLampCylinderB.receiveShadow = true;
+                gardenLampCylinderB.castShadow = true;
+                scene.add( gardenLampCylinderB );
+                
+                //Light C
+		      	bulbLightC = new THREE.PointLight( 0xffffff, 2, 140, 2 );
+				bulbLightC.add( new THREE.Mesh( bulbGeometry, bulbMat ) );
+				bulbLightC.position.set( 440, -198, -230);
+				bulbLightC.castShadow = true;
+				scene.add( bulbLightC );
+				
+				bulbHelperC = new THREE.PointLightHelper( bulbLightC );
+				scene.add( bulbHelperC );
+				   
+                var gardenLampSphereC = new THREE.Mesh( sphereGeometry, sphereMaterial );
+                gardenLampSphereC.position.set(440, -220, -230);
+                gardenLampSphereC.receiveShadow = true;
+				gardenLampSphereC.castShadow = true;
+                scene.add( gardenLampSphereC );
+                
+                var cylinderGeometry = new THREE.CylinderGeometry( 5, 5, 70, 8 );
+                var gardenLampCylinderC = new THREE.Mesh( cylinderGeometry, sphereMaterial );
+                gardenLampCylinderC.position.set(430, -220, -230);
+                gardenLampCylinderC.receiveShadow = true;
+                gardenLampCylinderC.castShadow = true;
+                scene.add( gardenLampCylinderC );
+							
+				// End of garden lights
+				
+								
+				//Add sunlight
+
+				sun = new THREE.DirectionalLight( 0xffffff, 0.7 );
+				sun.position.set( 1600, 2000, -1800 );
+				sun.position.multiplyScalar( 2.0 );
+				sun.decay = 1; //set to 2 for physically correct lighting
+				sun.castShadow = true;
+				sun.shadow.mapSize.width = 1048;
+				sun.shadow.mapSize.height = 1048;
+
+				var d = 1300;
+
+				sun.shadow.camera.left = - d;
+				sun.shadow.camera.right =  d;
+				sun.shadow.camera.top = d;
+				sun.shadow.camera.bottom = - d;
+                sun.shadow.camera.near = 1.0;
+				sun.shadow.camera.far = 10000;
+				scene.add( sun );
+				
+				lightHelper = new THREE.DirectionalLightHelper( sun );
+				scene.add( lightHelper );
+				
+				shadowCameraHelper = new THREE.CameraHelper( sun.shadow.camera );
+				scene.add( shadowCameraHelper );
+               
+                // add ambient light to make shadows a touch lighter
+                       
+                var ambient = new THREE.AmbientLight( 0xffffff, 0.02 );
+				scene.add( ambient );
+                
+                
+				// ground
+				var loader = new THREE.TextureLoader();
+				var groundTexture = loader.load( 'textures/grasslight-small-2.jpg' );
+				groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
+				groundTexture.repeat.set( 25, 25 );
+				groundTexture.anisotropy = 5;
+
+				var groundMaterial = new THREE.MeshPhongMaterial( { color: 0xffffff, specular: 0x111111, map: groundTexture } );
+                groundMaterial.needsUpdate = true;
+                
+				var mesh = new THREE.Mesh( new THREE.PlaneBufferGeometry( 20000, 20000 ), groundMaterial );
+				mesh.position.y = - 250;
+				mesh.rotation.x = - Math.PI / 2;
+				mesh.receiveShadow = true;
+				scene.add( mesh );
+
+				// box for barn
+				
+				var barnGeo = new THREE.BoxGeometry( 780, 370, 600 );
+				
+				var barnTexture = loader.load( 'textures/brick.jpg' );
+				barnTexture.wrapS = barnTexture.wrapT = THREE.RepeatWrapping;
+				barnTexture.repeat.set( 2.8, 1.4);
+				barnTexture.anisotropy = 16;
+
+				var barnMaterial = new THREE.MeshPhongMaterial( { color: 0xffffff, specular: 0x444444, bumpMap: barnTexture, map: barnTexture, bumpScale: 3.00 } );
+			    //barnMaterial.emissive = 0x444444;
+			    barnMaterial.needsUpdate = true;
+
+
+				var barn = new THREE.Mesh( barnGeo, barnMaterial );
+				barn.position.x = 0;
+				barn.position.y = - 65;
+				barn.position.z = 0;
+				barn.receiveShadow = true;
+				barn.castShadow = true;
+				scene.add( barn );
+				
+				// door for barn
+				
+				var doorGeo = new THREE.BoxGeometry( 5, 370, 320 );
+				
+				var doorTexture = loader.load( 'textures/door.jpg' );
+				doorTexture.wrapS = doorTexture.wrapT = THREE.RepeatWrapping;
+				doorTexture.repeat.set( 1, 1);
+				doorTexture.anisotropy = 16;
+
+				var doorMaterial = new THREE.MeshPhongMaterial( { color: 0xffffff, specular: 0x444444, bumpMap: doorTexture, map: doorTexture, bumpScale: 2.00 } );
+			    doorMaterial.needsUpdate = true;
+
+			    var door = new THREE.Mesh( doorGeo, doorMaterial );
+				door.position.x = 392;
+				door.position.y = -70;
+				door.position.z = 0;
+				door.receiveShadow = true;
+				door.castShadow = true;
+				scene.add( door );
+				
+
+				// roof for barn
+				var roofGeo = new THREE.CylinderGeometry( 380, 380, 800, 3 );
+				
+				var roofTexture = loader.load( 'textures/shingles.jpg' );
+				roofTexture.wrapS = roofTexture.wrapT = THREE.RepeatWrapping;
+				roofTexture.repeat.set( 1,1);
+			
+
+				var roofMaterial = new THREE.MeshPhongMaterial( { color: 0x333333, specular: 0x444444, shininess: 20, bumpMap: roofTexture, map: roofTexture, bumpScale: 0.8 } );
+				roofMaterial.needsUpdate = true;
+
+             
+				var roof = new THREE.Mesh( roofGeo, roofMaterial );
+				rotateObject( roof, 270, 0 ,90);
+				roof.scale.set( 1 , 1, 0.6 );
+				roof.position.x = 0;
+				roof.position.y = 232;
+				roof.position.z = 0;
+				roof.receiveShadow = false;
+				roof.castShadow = true;
+				scene.add( roof );
+
+				// base box for water tank
+				var baseGeo = new THREE.BoxGeometry( 200, 60, 200 );
+				
+				var baseTexture = loader.load( 'textures/concrete.jpg' );
+				baseTexture.wrapS = baseTexture.wrapT = THREE.RepeatWrapping;
+				baseTexture.repeat.set( 1,1);
+				baseTexture.anisotropy = 10;
+
+				var baseMaterial = new THREE.MeshPhongMaterial( { color: 0xffffff, specular: 0x666666, shininess: 9, map: baseTexture } );
+				baseMaterial.needsUpdate = true;
+
+				var base = new THREE.Mesh( baseGeo, baseMaterial );
+				base.position.x = 300;
+				base.position.y = -240;
+				base.position.z = 400;
+				base.receiveShadow = true;
+				base.castShadow = true;
+				scene.add( base );
+
+				// water tank
+				var tankGeo = new THREE.CylinderGeometry( 96, 96, 240, 20 );
+				
+				var tankTexture = loader.load( 'textures/galv.jpg' );
+				tankTexture.wrapS = tankTexture.wrapT = THREE.RepeatWrapping;
+				tankTexture.repeat.set( 4,2);
+				baseTexture.anisotropy = 10;
+
+				var tankMaterial = new THREE.MeshPhongMaterial( { color: 0xffffff, specular: 0x999999, shininess: 20, map: tankTexture } );
+				tankMaterial.needsUpdate = true;
+
+				var tank = new THREE.Mesh( tankGeo, tankMaterial );
+				tank.position.x = 300;
+				tank.position.y = -116;
+				tank.position.z = 400;
+				tank.receiveShadow = true;
+				tank.castShadow = true;
+				scene.add( tank );
+
+				// tree trunk
+				var trunkGeo = new THREE.CylinderGeometry( 26, 30, 140, 8 );
+				var trunkTexture = loader.load( 'textures/bark.jpg' );
+				trunkTexture.wrapS = trunkTexture.wrapT = THREE.RepeatWrapping;
+				trunkTexture.repeat.set( 2, 2 );
+				var trunkMat = new THREE.MeshPhongMaterial( { color: 0xffffff, specular: 0x666666, shininess: 1,  bumpMap: trunkTexture, map: trunkTexture, bumpScale: 1.0 } );
+				trunkMat.needsUpdate = true;
+   
+
+				// tree leaves
+				var leaveGeo = new THREE.ConeGeometry( 130, 500, 18, 4 );
+				var leaveTexture = loader.load( 'textures/leaves.jpg' );
+				leaveTexture.wrapS = leaveTexture.wrapT = THREE.RepeatWrapping;
+				leaveTexture.repeat.set( 4, 4 );
+				var leaveMat = new THREE.MeshPhongMaterial( { color: 0xffffff, specular: 0x666666, shininess: 3, bumpMap: leaveTexture, map: leaveTexture, bumpScale: 1.0 } );
+	            leaveMat.needsUpdate = true;
+
+
+				// trees
+				
+					var trunkMeshA = new THREE.Mesh( trunkGeo, trunkMat );
+				
+					trunkMeshA.position.x = 600;
+					trunkMeshA.position.y = -200;
+					trunkMeshA.position.z = -1100;
+					trunkMeshA.recieveShadow = true;
+					trunkMeshA.castShadow = true;
+					scene.add( trunkMeshA );
+
+					var leaveMeshA = new THREE.Mesh( leaveGeo, leaveMat );
+					leaveMeshA.position.x = 600;
+					leaveMeshA.position.y = 120;
+					leaveMeshA.position.z = -1100;
+			    	leaveMeshA.receiveShadow = true;
+					leaveMeshA.castShadow = true;
+					scene.add( leaveMeshA );
+					
+					var trunkMeshB = new THREE.Mesh( trunkGeo, trunkMat );
+				
+					trunkMeshB.position.x = 900;
+					trunkMeshB.position.y = -210;
+					trunkMeshB.position.z = -1300;
+					trunkMeshB.recieveShadow = true;
+					trunkMeshB.castShadow = true;
+					scene.add( trunkMeshB );
+
+					var leaveMeshB = new THREE.Mesh( leaveGeo, leaveMat );
+					leaveMeshB.position.x = 900;
+					leaveMeshB.position.y = 110;
+					leaveMeshB.position.z = -1300;
+			    	leaveMeshB.receiveShadow = true;
+					leaveMeshB.castShadow = true;
+					scene.add( leaveMeshB );
+						
+				controls.target = new THREE.Vector3(0,0,0);
+				controls.update();
+		
+				window.addEventListener( 'resize', onResize, false );
+
+			}
+
+   
+
+			// Function to rotate object in degrees
+			function rotateObject(object,degreeX=0, degreeY=0, degreeZ=0){
+
+   			degreeX = (degreeX * Math.PI)/180;
+   			degreeY = (degreeY * Math.PI)/180;
+   			degreeZ = (degreeZ * Math.PI)/180;
+
+		   	object.rotateX(degreeX);
+   			object.rotateY(degreeY);
+			object.rotateZ(degreeZ);
+
+				}
+
+
+
+
+			function onResize() {
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+				renderer.setSize( window.innerWidth, window.innerHeight );
+			}
+
+
+            //animate
+            function animate() {
+				requestAnimationFrame( animate );
+				render();
+			}
+        
+			
+			//new render function
+			function render() {
+			  
+			    camera.lookAt( scene.position ); 
+			    camera.updateProjectionMatrix();
+			     
+				lightHelper.update();
+				shadowCameraHelper.update();
+				
+				bulbLightA.power = sunlight;
+				bulbLightB.power = bulbLightA.power;		
+				bulbLightC.power = bulbLightA.power;	
+				
+				bulbMat.emissiveIntensity = bulbLightA.intensity / Math.pow( 0.02, 2.0 );
+			     
+				
+				var time = Date.now() * 0.0005;
+				var delta = clock.getDelta();
+					
+				if (sunlight == 110000) {
+				    sun.intensity = 0;
+				    } else if (sunlight == 0){
+				    sun.intensity = 6;
+			        } 
+				
+				renderer.render( scene, camera );
+		
+			}
+	
+				
+			render();
+
+
+		</script>
+	</body>
+</html>
